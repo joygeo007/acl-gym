@@ -6,77 +6,21 @@
 <title>ACL Comeback Pro</title>
 
 <style>
-body {
-  margin:0;
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  background:#f2f4f8;
-}
-
-header {
-  background:#111827;
-  color:white;
-  padding:15px;
-  text-align:center;
-  font-size:20px;
-  font-weight:bold;
-}
-
-.container {
-  padding:15px;
-  padding-bottom:120px;
-}
-
-.card {
-  background:white;
-  padding:15px;
-  border-radius:16px;
-  margin-bottom:15px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.08);
-}
-
-.exercise {
-  padding:10px 0;
-  border-bottom:1px solid #eee;
-}
-
-button {
-  width:100%;
-  padding:14px;
-  border:none;
-  border-radius:12px;
-  font-size:16px;
-  margin-top:10px;
-}
-
-.primary { background:#2563eb; color:white; }
-.good { background:#16a34a; color:white; }
-.medium { background:#f59e0b; }
-.bad { background:#dc2626; color:white; }
-
-.calendar {
-  display:grid;
-  grid-template-columns: repeat(7,1fr);
-  gap:4px;
-  font-size:12px;
-}
-
-.day {
-  padding:8px;
-  text-align:center;
-  border-radius:8px;
-}
-
-.today { background:#2563eb; color:white; }
-.done { background:#16a34a; color:white; }
-
-.footer {
-  position:fixed;
-  bottom:0;
-  width:100%;
-  background:white;
-  padding:10px;
-  box-shadow:0 -2px 10px rgba(0,0,0,0.1);
-}
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,sans-serif; background:#f2f4f8;}
+header { background:#111827; color:white; padding:15px; text-align:center; font-size:20px; font-weight:bold;}
+.container { padding:15px; padding-bottom:120px;}
+.card { background:white; padding:15px; border-radius:16px; margin-bottom:15px; box-shadow:0 4px 12px rgba(0,0,0,0.08);}
+.exercise { padding:10px 0; border-bottom:1px solid #eee;}
+button { width:100%; padding:14px; border:none; border-radius:12px; font-size:16px; margin-top:10px;}
+.primary { background:#2563eb; color:white;}
+.good { background:#16a34a; color:white;}
+.medium { background:#f59e0b;}
+.bad { background:#dc2626; color:white;}
+.calendar { display:grid; grid-template-columns: repeat(7,1fr); gap:4px; font-size:12px;}
+.day { padding:8px; text-align:center; border-radius:8px;}
+.today { background:#2563eb; color:white;}
+.done { background:#16a34a; color:white;}
+.footer { position:fixed; bottom:0; width:100%; background:white; padding:10px; box-shadow:0 -2px 10px rgba(0,0,0,0.1);}
 </style>
 </head>
 
@@ -88,6 +32,7 @@ button {
 
 <div class="card">
 <h3 id="date"></h3>
+<h2 id="phase"></h2>
 <h2 id="workoutName"></h2>
 <div id="exerciseList"></div>
 <div id="roundSection"></div>
@@ -107,18 +52,54 @@ button {
 </div>
 
 <div class="card">
-<h3>Progress</h3>
+<h3>Progress (Gym Phase Only)</h3>
 <div id="progress"></div>
 </div>
 
 </div>
 
 <div class="footer">
-Small daily progress > Big inconsistent effort.
+Rebuild slow. Build forever.
 </div>
 
 <script>
-const workouts = [
+
+const today = new Date();
+document.getElementById("date").innerText = today.toDateString();
+
+const marchFirst = new Date(today.getFullYear(),2,1);
+const isGymPhase = today >= marchFirst;
+
+document.getElementById("phase").innerText = 
+  isGymPhase ? "Gym Phase" : "Home Reactivation Phase";
+
+let knee = localStorage.getItem("knee") || "good";
+let history = JSON.parse(localStorage.getItem("history") || "{}");
+let weights = JSON.parse(localStorage.getItem("weights") || "{}");
+
+/* HOME WORKOUTS (Feb 24-29) */
+
+const homeWorkouts = [
+  {name:"Lower Rehab", rounds:2, exercises:[
+    {name:"Glute Bridges", reps:"12"},
+    {name:"Wall Sit", reps:"30 sec"},
+    {name:"Step Ups", reps:"8 each"},
+    {name:"Side Leg Raises", reps:"12 each"}
+  ]},
+  {name:"Upper + Core", rounds:2, exercises:[
+    {name:"DB Floor Press (10kg)", reps:"10"},
+    {name:"DB Row (10kg)", reps:"10 each"},
+    {name:"Seated DB Press", reps:"8-10"},
+    {name:"Plank", reps:"30 sec"}
+  ]},
+  {name:"Cardio Walk", rounds:1, exercises:[
+    {name:"Brisk Walk", reps:"20 min"}
+  ]}
+];
+
+/* GYM WORKOUTS */
+
+const gymWorkouts = [
   {name:"Lower A", type:"lower", rounds:3, exercises:[
     {name:"Leg Press", base:60, reps:"12"},
     {name:"Ham Curl", base:25, reps:"12"},
@@ -132,8 +113,7 @@ const workouts = [
     {name:"Lateral Raise", base:6, reps:"12"}
   ]},
   {name:"Cardio", type:"cardio", rounds:1, exercises:[
-    {name:"Bike", base:0, reps:"20 min steady"},
-    {name:"Plank", base:0, reps:"30s x3"}
+    {name:"Bike", base:0, reps:"20 min steady"}
   ]},
   {name:"Lower B", type:"lower", rounds:3, exercises:[
     {name:"Goblet Squat", base:10, reps:"8"},
@@ -143,35 +123,34 @@ const workouts = [
   ]}
 ];
 
-const today = new Date();
-document.getElementById("date").innerText = today.toDateString();
-
-let dayIndex = Math.floor((today - new Date(2026,1,24)) / 86400000);
-dayIndex = ((dayIndex % workouts.length) + workouts.length) % workouts.length;
-const session = workouts[dayIndex];
+let session;
+if(isGymPhase){
+  let dayIndex = Math.floor((today - marchFirst) / 86400000);
+  dayIndex = ((dayIndex % gymWorkouts.length)+gymWorkouts.length)%gymWorkouts.length;
+  session = gymWorkouts[dayIndex];
+}else{
+  let startHome = new Date(today.getFullYear(),1,24);
+  let dayIndex = Math.floor((today - startHome) / 86400000);
+  dayIndex = ((dayIndex % homeWorkouts.length)+homeWorkouts.length)%homeWorkouts.length;
+  session = homeWorkouts[dayIndex];
+}
 
 document.getElementById("workoutName").innerText = session.name;
 
-let knee = localStorage.getItem("knee") || "good";
-let history = JSON.parse(localStorage.getItem("history") || "{}");
-let weights = JSON.parse(localStorage.getItem("weights") || "{}");
-
 let exerciseHTML="";
 session.exercises.forEach(ex=>{
-  if(!weights[ex.name]) weights[ex.name]=ex.base;
-
-  let weight = weights[ex.name];
-
-  if(session.type==="lower" && knee==="bad"){
-    weight = Math.round(weight * 0.8);
+  if(isGymPhase && ex.base !== undefined){
+    if(!weights[ex.name]) weights[ex.name]=ex.base;
+    let weight = weights[ex.name];
+    if(session.type==="lower" && knee==="bad"){
+      weight = Math.round(weight * 0.8);
+    }
+    exerciseHTML += `<div class="exercise"><strong>${ex.name}</strong><br>${weight>0?weight+" kg - ":""}${ex.reps}</div>`;
+  }else{
+    exerciseHTML += `<div class="exercise"><strong>${ex.name}</strong><br>${ex.reps}</div>`;
   }
-
-  exerciseHTML += `
-  <div class="exercise">
-    <strong>${ex.name}</strong><br>
-    ${weight>0? weight+" kg - ":""}${ex.reps}
-  </div>`;
 });
+
 document.getElementById("exerciseList").innerHTML = exerciseHTML;
 
 let roundsHTML="<h4>Rounds</h4>";
@@ -183,7 +162,7 @@ document.getElementById("roundSection").innerHTML=roundsHTML;
 function setKnee(status){
   knee=status;
   localStorage.setItem("knee",status);
-  alert("Saved. Adjustment applied if needed.");
+  alert("Saved.");
   location.reload();
 }
 
@@ -195,18 +174,20 @@ function completeWorkout(){
     }
   }
 
-  session.exercises.forEach(ex=>{
-    if(ex.base>0){
-      if(session.type==="lower") weights[ex.name]+=5;
-      if(session.type==="upper") weights[ex.name]+=2.5;
-    }
-  });
+  if(isGymPhase){
+    session.exercises.forEach(ex=>{
+      if(ex.base>0){
+        if(session.type==="lower") weights[ex.name]+=5;
+        if(session.type==="upper") weights[ex.name]+=2.5;
+      }
+    });
+    localStorage.setItem("weights",JSON.stringify(weights));
+  }
 
   history[today.toDateString()]=true;
   localStorage.setItem("history",JSON.stringify(history));
-  localStorage.setItem("weights",JSON.stringify(weights));
 
-  alert("Workout saved. Progress increased.");
+  alert("Workout saved.");
   location.reload();
 }
 
@@ -226,6 +207,10 @@ function renderCalendar(){
 renderCalendar();
 
 function renderProgress(){
+  if(!isGymPhase){
+    document.getElementById("progress").innerText="Progress tracking starts March 1.";
+    return;
+  }
   let html="";
   for(let key in weights){
     html+=`<div>${key}: ${weights[key]} kg</div>`;
@@ -233,6 +218,7 @@ function renderProgress(){
   document.getElementById("progress").innerHTML=html;
 }
 renderProgress();
+
 </script>
 
 </body>
