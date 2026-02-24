@@ -21,6 +21,7 @@ button { width:100%; padding:14px; border:none; border-radius:12px; font-size:16
 .today { background:#2563eb; color:white;}
 .done { background:#16a34a; color:white;}
 .footer { position:fixed; bottom:0; width:100%; background:white; padding:10px; box-shadow:0 -2px 10px rgba(0,0,0,0.1);}
+.sectionTitle { margin-top:10px; font-weight:bold; }
 </style>
 </head>
 
@@ -34,7 +35,13 @@ button { width:100%; padding:14px; border:none; border-radius:12px; font-size:16
 <h3 id="date"></h3>
 <h2 id="phase"></h2>
 <h2 id="workoutName"></h2>
+
+<div class="sectionTitle">Warm-Up</div>
+<div id="warmupList"></div>
+
+<div class="sectionTitle">Main Workout</div>
 <div id="exerciseList"></div>
+
 <div id="roundSection"></div>
 <button class="primary" onclick="completeWorkout()">Complete Workout</button>
 </div>
@@ -52,18 +59,17 @@ button { width:100%; padding:14px; border:none; border-radius:12px; font-size:16
 </div>
 
 <div class="card">
-<h3>Progress (Gym Phase Only)</h3>
+<h3>Progress (Gym Phase)</h3>
 <div id="progress"></div>
 </div>
 
 </div>
 
 <div class="footer">
-Rebuild slow. Build forever.
+Warm up like a pro. Train like an athlete.
 </div>
 
 <script>
-
 const today = new Date();
 document.getElementById("date").innerText = today.toDateString();
 
@@ -77,28 +83,26 @@ let knee = localStorage.getItem("knee") || "good";
 let history = JSON.parse(localStorage.getItem("history") || "{}");
 let weights = JSON.parse(localStorage.getItem("weights") || "{}");
 
-/* HOME WORKOUTS (Feb 24-29) */
-
+/* HOME WORKOUTS */
 const homeWorkouts = [
-  {name:"Lower Rehab", rounds:2, exercises:[
+  {name:"Lower Rehab", type:"lower", rounds:2, exercises:[
     {name:"Glute Bridges", reps:"12"},
     {name:"Wall Sit", reps:"30 sec"},
     {name:"Step Ups", reps:"8 each"},
     {name:"Side Leg Raises", reps:"12 each"}
   ]},
-  {name:"Upper + Core", rounds:2, exercises:[
+  {name:"Upper + Core", type:"upper", rounds:2, exercises:[
     {name:"DB Floor Press (10kg)", reps:"10"},
     {name:"DB Row (10kg)", reps:"10 each"},
     {name:"Seated DB Press", reps:"8-10"},
     {name:"Plank", reps:"30 sec"}
   ]},
-  {name:"Cardio Walk", rounds:1, exercises:[
+  {name:"Cardio Walk", type:"cardio", rounds:1, exercises:[
     {name:"Brisk Walk", reps:"20 min"}
   ]}
 ];
 
 /* GYM WORKOUTS */
-
 const gymWorkouts = [
   {name:"Lower A", type:"lower", rounds:3, exercises:[
     {name:"Leg Press", base:60, reps:"12"},
@@ -123,6 +127,7 @@ const gymWorkouts = [
   ]}
 ];
 
+/* Determine session */
 let session;
 if(isGymPhase){
   let dayIndex = Math.floor((today - marchFirst) / 86400000);
@@ -137,6 +142,34 @@ if(isGymPhase){
 
 document.getElementById("workoutName").innerText = session.name;
 
+/* Warmup logic */
+let warmups = [];
+
+if(isGymPhase){
+  warmups.push("5 min Stationary Bike (easy pace)");
+  if(session.type==="lower"){
+    warmups.push("Glute Bridges x12");
+    warmups.push("Bodyweight Squats x10");
+    warmups.push("Light Set of First Exercise");
+  }
+  if(session.type==="upper"){
+    warmups.push("Arm Circles 30 sec");
+    warmups.push("Scapular Push-ups x10");
+    warmups.push("Light Set First Exercise");
+  }
+}else{
+  warmups.push("2 min March in Place");
+  warmups.push("Leg Swings x10 each");
+  warmups.push("Ankle Circles 20 sec");
+}
+
+let warmHTML="";
+warmups.forEach((w,i)=>{
+  warmHTML+=`<div><input type="checkbox" id="w${i}"> ${w}</div>`;
+});
+document.getElementById("warmupList").innerHTML=warmHTML;
+
+/* Main workout */
 let exerciseHTML="";
 session.exercises.forEach(ex=>{
   if(isGymPhase && ex.base !== undefined){
@@ -150,9 +183,9 @@ session.exercises.forEach(ex=>{
     exerciseHTML += `<div class="exercise"><strong>${ex.name}</strong><br>${ex.reps}</div>`;
   }
 });
-
 document.getElementById("exerciseList").innerHTML = exerciseHTML;
 
+/* Rounds */
 let roundsHTML="<h4>Rounds</h4>";
 for(let i=1;i<=session.rounds;i++){
   roundsHTML+=`<div><input type="checkbox" id="r${i}"> Round ${i}</div>`;
@@ -160,16 +193,25 @@ for(let i=1;i<=session.rounds;i++){
 document.getElementById("roundSection").innerHTML=roundsHTML;
 
 function setKnee(status){
-  knee=status;
   localStorage.setItem("knee",status);
   alert("Saved.");
   location.reload();
 }
 
 function completeWorkout(){
+
+  /* Warmup must be completed */
+  for(let i=0;i<warmups.length;i++){
+    if(!document.getElementById("w"+i).checked){
+      alert("Complete warm-up first.");
+      return;
+    }
+  }
+
+  /* Rounds must be completed */
   for(let i=1;i<=session.rounds;i++){
     if(!document.getElementById("r"+i).checked){
-      alert("Finish all rounds first.");
+      alert("Finish all rounds.");
       return;
     }
   }
@@ -191,6 +233,7 @@ function completeWorkout(){
   location.reload();
 }
 
+/* Calendar */
 function renderCalendar(){
   const cal=document.getElementById("calendar");
   cal.innerHTML="";
@@ -206,9 +249,10 @@ function renderCalendar(){
 }
 renderCalendar();
 
+/* Progress */
 function renderProgress(){
   if(!isGymPhase){
-    document.getElementById("progress").innerText="Progress tracking starts March 1.";
+    document.getElementById("progress").innerText="Progress starts March 1.";
     return;
   }
   let html="";
